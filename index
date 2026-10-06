@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Administrador de Gastos - CREDIBAN</title>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Drag & Drop (react-beautiful-dnd) -->
+    <script src="https://unpkg.com/react-beautiful-dnd@13.1.1/dist/react-beautiful-dnd.js"></script>
+    <!-- jsPDF para Exportar a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { DragDropContext, Droppable, Draggable } = window.ReactBeautifulDnd;
+
+        // Data inicial enriquecida (La mayor cantidad de opciones)
+        const initialData = [
+            // COSTOS FIJOS
+            { id: 'cat-f-1', nombre: 'Planillas y Recursos Humanos', clasificacion: 'Fijo', items: [
+                { id: 'item-f1-1', content: 'Planilla Sueldos' },
+                { id: 'item-f1-2', content: 'Planilla AFP / ONP' },
+                { id: 'item-f1-3', content: 'Planilla de movilidad fija' },
+                { id: 'item-f1-4', content: 'Aportes de Salud (EsSalud/EPS)' },
+                { id: 'item-f1-5', content: 'Beneficios Sociales (CTS, Grati)' }
+            ]},
+            { id: 'cat-f-2', nombre: 'Honorarios Profesionales y Terceros', clasificacion: 'Fijo', items: [
+                { id: 'item-f2-1', content: 'Pago de contabilidad' },
+                { id: 'item-f2-2', content: 'Servicios informáticos y web' },
+                { id: 'item-f2-3', content: 'Auditorías o asesorías externas' }
+            ]},
+            { id: 'cat-f-3', nombre: 'Costos Operativos e Infraestructura', clasificacion: 'Fijo', items: [
+                { id: 'item-f3-1', content: 'Alquiler del local' },
+                { id: 'item-f3-2', content: 'Energía eléctrica' },
+                { id: 'item-f3-3', content: 'Agua potable' },
+                { id: 'item-f3-4', content: 'Internet fijo / Fibra óptica' },
+                { id: 'item-f3-5', content: 'Telefonía fija' }
+            ]},
+            { id: 'cat-f-4', nombre: 'Seguridad, Mantenimiento y Limpieza', clasificacion: 'Fijo', items: [
+                { id: 'item-f4-1', content: 'Mantenimiento y recarga de extintores' },
+                { id: 'item-f4-2', content: 'Monitoreo de cámaras de seguridad (CCTV)' },
+                { id: 'item-f4-3', content: 'Servicio mensual de alarmas' },
+                { id: 'item-f4-4', content: 'Mantenimiento de infraestructura (gasfitería, electricidad)' },
+                { id: 'item-f4-5', content: 'Insumos de aseo y artículos de limpieza' }
+            ]},
+            
+            // COSTOS VARIABLES
+            { id: 'cat-v-1', nombre: 'Comisiones e Incentivos', clasificacion: 'Variable', items: [
+                { id: 'item-v1-1', content: 'Comisión por clientes nuevos (primer desembolso)' },
+                { id: 'item-v1-2', content: 'Comisión por renovación de crédito' },
+                { id: 'item-v1-3', content: 'Bono por cumplimiento de metas mensuales' },
+                { id: 'item-v1-4', content: 'Premio al mejor asesor del mes' }
+            ]},
+            { id: 'cat-v-2', nombre: 'Gastos Legales, Notariales y Cobranza', clasificacion: 'Variable', items: [
+                { id: 'item-v2-1', content: 'Recuperación de mora temprana (8-30 días)' },
+                { id: 'item-v2-2', content: 'Recuperación de cartera pesada' },
+                { id: 'item-v2-3', content: 'Gastos notariales (legalizaciones, cartas)' },
+                { id: 'item-v2-4', content: 'Gastos legales (Sunarp, trámites judiciales)' }
+            ]},
+            { id: 'cat-v-3', nombre: 'Bienestar Laboral, Eventos y Reuniones', clasificacion: 'Variable', items: [
+                { id: 'item-v3-1', content: 'Reuniones - Cumpleaños del personal' },
+                { id: 'item-v3-2', content: 'Reuniones - Aniversario de Agencia' },
+                { id: 'item-v3-3', content: 'Reuniones - Almuerzos de fin de mes' },
+                { id: 'item-v3-4', content: 'Reuniones - Ocasionales y Desayunos' },
+                { id: 'item-v3-5', content: 'Fidelización de clientes VIP' }
+            ]},
+            { id: 'cat-v-4', nombre: 'Materiales, Suministros y Publicidad', clasificacion: 'Variable', items: [
+                { id: 'item-v4-1', content: 'Útiles de oficina y papelería' },
+                { id: 'item-v4-2', content: 'Confección de sellos' },
+                { id: 'item-v4-3', content: 'Suministros de impresión (tóners, rollos)' },
+                { id: 'item-v4-4', content: 'Formatos de contratos y pagarés' },
+                { id: 'item-v4-5', content: 'Marketing (Flyers, publicidad digital)' }
+            ]},
+            { id: 'cat-v-5', nombre: 'Viáticos, Movilidad y Transporte', clasificacion: 'Variable', items: [
+                { id: 'item-v5-1', content: 'Pasajes urbanos locales (micros, colectivos)' },
+                { id: 'item-v5-2', content: 'Servicio de Taxis (emergencias, bancos)' },
+                { id: 'item-v5-3', content: 'Viáticos interprovinciales (pasajes, hotel, comida)' },
+                { id: 'item-v5-4', content: 'Combustible y parqueo' }
+            ]},
+            { id: 'cat-v-6', nombre: 'Tecnología y Otros Gastos Operativos', clasificacion: 'Variable', items: [
+                { id: 'item-v6-1', content: 'Celulares y planes postpago corporativos' },
+                { id: 'item-v6-2', content: 'Reparación técnica de celulares o equipos' },
+                { id: 'item-v6-3', content: 'Compra de equipos (Laptops, impresoras)' },
+                { id: 'item-v6-4', content: 'Comisiones bancarias y mantenimiento de cuentas' },
+                { id: 'item-v6-5', content: 'Gastos no deducibles (Sin comprobante / Caja chica)' }
+            ]}
+        ];
+
+        function AdminGastosApp() {
+            // Estado Principal: Cargar de LocalStorage o usar InitialData
+            const [data, setData] = React.useState(() => {
+                const saved = localStorage.getItem('crediban_categorias_admin');
+                if (saved) return JSON.parse(saved);
+                return initialData;
+            });
+
+            // Formulario nueva categoría
+            const [nuevaCat, setNuevaCat] = React.useState({ nombre: '', clasificacion: 'Fijo' });
+            // Input para nuevo item por categoría
+            const [nuevoItemInputs, setNuevoItemInputs] = React.useState({});
+
+            // Guardar en LocalStorage cada vez que cambie 'data'
+            React.useEffect(() => {
+                localStorage.setItem('crediban_categorias_admin', JSON.stringify(data));
+            }, [data]);
+
+            // Utilidades para Generar IDs
+            const generateId = (prefix) => `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // ---- LÓGICA DRAG & DROP ----
+            const onDragEnd = (result) => {
+                const { source, destination } = result;
+
+                // Si soltó fuera de un área válida
+                if (!destination) return;
+
+                // Si soltó en el mismo lugar
+                if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+                const newData = [...data];
+                const sourceCatIndex = newData.findIndex(cat => cat.id === source.droppableId);
+                const destCatIndex = newData.findIndex(cat => cat.id === destination.droppableId);
+
+                const sourceCat = newData[sourceCatIndex];
+                const destCat = newData[destCatIndex];
+
+                // Mover dentro de la misma categoría
+                if (sourceCat.id === destCat.id) {
+                    const newItems = Array.from(sourceCat.items);
+                    const [removed] = newItems.splice(source.index, 1);
+                    newItems.splice(destination.index, 0, removed);
+                    
+                    newData[sourceCatIndex] = { ...sourceCat, items: newItems };
+                    setData(newData);
+                    return;
+                }
+
+                // Mover entre categorías diferentes
+                const sourceItems = Array.from(sourceCat.items);
+                const destItems = Array.from(destCat.items);
+                const [removed] = sourceItems.splice(source.index, 1);
+                
+                destItems.splice(destination.index, 0, removed);
+
+                newData[sourceCatIndex] = { ...sourceCat, items: sourceItems };
+                newData[destCatIndex] = { ...destCat, items: destItems };
+                
+                setData(newData);
+            };
+
+            // ---- LÓGICA DE GESTIÓN ----
+            const handleAddCategoria = (e) => {
+                e.preventDefault();
+                if (!nuevaCat.nombre.trim()) return;
+                
+                const nueva = {
+                    id: generateId('cat'),
+                    nombre: nuevaCat.nombre.trim(),
+                    clasificacion: nuevaCat.clasificacion,
+                    items: []
+                };
+                
+                setData([...data, nueva]);
+                setNuevaCat({ nombre: '', clasificacion: 'Fijo' });
+            };
+
+            const handleDeleteCategoria = (id, nombre) => {
+                if(confirm(`¿Eliminar la categoría "${nombre}" y todos sus subtipos?`)) {
+                    setData(data.filter(cat => cat.id !== id));
+                }
+            };
+
+            const handleAddItem = (catId) => {
+                const text = nuevoItemInputs[catId];
+                if (!text || !text.trim()) return;
+
+                const newItem = {
+                    id: generateId('item'),
+                    content: text.trim()
+                };
+
+                const newData = data.map(cat => {
+                    if (cat.id === catId) {
+                        return { ...cat, items: [...cat.items, newItem] };
+                    }
+                    return cat;
+                });
+
+                setData(newData);
+                setNuevoItemInputs({ ...nuevoItemInputs, [catId]: '' });
+            };
+
+            const handleDeleteItem = (catId, itemId) => {
+                const newData = data.map(cat => {
+                    if (cat.id === catId) {
+                        return { ...cat, items: cat.items.filter(item => item.id !== itemId) };
+                    }
+                    return cat;
+                });
+                setData(newData);
+            };
+
+            // ---- EXPORTACIÓN CSV ----
+            const exportToCSV = () => {
+                let csv = "\uFEFFID_Categoria,Clasificacion,Tipo,Subtipo\n";
+                data.forEach(cat => {
+                    if (cat.items.length === 0) {
+                        csv += `${cat.id},${cat.clasificacion},"${cat.nombre}",""\n`;
+                    } else {
+                        cat.items.forEach(item => {
+                            csv += `${cat.id},${cat.clasificacion},"${cat.nombre}","${item.content}"\n`;
+                        });
+                    }
+                });
+
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Parametros_Gastos_${new Date().toLocaleDateString('es-PE').replace(/\//g, '-')}.csv`;
+                a.click();
+            };
+
+            // ---- EXPORTACIÓN PDF ----
+            const exportToPDF = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const fecha = new Date().toLocaleDateString('es-PE');
+
+                doc.setFontSize(18);
+                doc.setTextColor(22, 163, 74); // Verde Crediban
+                doc.text('Catálogo Maestro de Gastos - CREDIBAN', 14, 20);
+                
+                doc.setFontSize(11);
+                doc.setTextColor(100);
+                doc.text(`Fecha de exportación: ${fecha}`, 14, 28);
+
+                let startY = 35;
+
+                // Generar tabla para Fijos
+                const fijos = data.filter(c => c.clasificacion === 'Fijo');
+                if (fijos.length > 0) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(37, 99, 235); // Azul
+                    doc.text('COSTOS FIJOS (Operativos e Infraestructura)', 14, startY);
+                    
+                    const fijosData = [];
+                    fijos.forEach(cat => {
+                        if (cat.items.length === 0) fijosData.push([cat.nombre, '-']);
+                        cat.items.forEach(item => {
+                            fijosData.push([cat.nombre, item.content]);
+                        });
+                    });
+
+                    doc.autoTable({
+                        startY: startY + 5,
+                        head: [['Tipo (Categoría)', 'Subtipo (Desglose)']],
+                        body: fijosData,
+                        theme: 'grid',
+                        headStyles: { fillColor: [37, 99, 235] },
+                        styles: { fontSize: 9 }
+                    });
+                    startY = doc.lastAutoTable.finalY + 15;
+                }
+
+                // Generar tabla para Variables
+                const variables = data.filter(c => c.clasificacion === 'Variable');
+                if (variables.length > 0) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(234, 88, 12); // Naranja
+                    doc.text('COSTOS VARIABLES Y GESTIÓN OPERATIVA', 14, startY);
+                    
+                    const varData = [];
+                    variables.forEach(cat => {
+                        if (cat.items.length === 0) varData.push([cat.nombre, '-']);
+                        cat.items.forEach(item => {
+                            varData.push([cat.nombre, item.content]);
+                        });
+                    });
+
+                    doc.autoTable({
+                        startY: startY + 5,
+                        head: [['Tipo (Categoría)', 'Subtipo (Desglose)']],
+                        body: varData,
+                        theme: 'grid',
+                        headStyles: { fillColor: [234, 88, 12] },
+                        styles: { fontSize: 9 }
+                    });
+                }
+
+                doc.save(`Catalogo_Gastos_Crediban_${fecha.replace(/\//g, '-')}.pdf`);
+            };
+
+            const fijos = data.filter(c => c.clasificacion === 'Fijo');
+            const variables = data.filter(c => c.clasificacion === 'Variable');
+
+            return (
+                <div className="min-h-screen flex flex-col pb-10">
+                    <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 sticky top-0 z-40">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                {/* Logo de Crediban SVG */}
+                                <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 240" className="w-full h-full">
+                                        <g fill="#59B447">
+                                            <rect x="90" y="8" width="24" height="13" rx="6.5"/>
+                                            <rect x="71" y="31" width="61" height="13" rx="6.5"/>
+                                            <rect x="50" y="55" width="74" height="13" rx="6.5"/>
+                                            <rect x="31" y="79" width="75" height="13" rx="6.5"/>
+                                            <rect x="24" y="103" width="63" height="13" rx="6.5"/>
+                                            <rect x="37" y="128" width="24" height="13" rx="6.5"/>
+                                            <path d="M143 55 C141 78 130 95 111 107 C96 117 81 122 72 134 C62 147 63 166 70 181 C76 195 87 208 97 216 C107 201 118 189 131 177 C144 166 157 156 164 141 C173 123 173 104 168 89 C164 74 156 62 143 55 Z"/>
+                                        </g>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-gray-800 tracking-tight">Administrador de Categorías</h1>
+                                    <p className="text-sm text-gray-500 font-medium">Configura el Dashboard Interactivo</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors flex items-center gap-2">
+                                    <span>📊</span> Exportar CSV
+                                </button>
+                                <button onClick={exportToPDF} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors flex items-center gap-2">
+                                    <span>📄</span> Exportar PDF
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 w-full mt-8">
+                        
+                        {/* Panel para agregar Categoría */}
+                        <div className="glass-card p-6 rounded-2xl mb-8 border border-gray-200">
+                            <h2 className="text-lg font-bold text-gray-800 mb-4">➕ Añadir Nueva Categoría Principal</h2>
+                            <form onSubmit={handleAddCategoria} className="flex flex-col sm:flex-row gap-4 items-end">
+                                <div className="flex-1 w-full">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre de la Categoría</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        placeholder="Ej. Eventos Especiales" 
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                        value={nuevaCat.nombre}
+                                        onChange={e => setNuevaCat({...nuevaCat, nombre: e.target.value})}
+                                    />
+                                </div>
+                                <div className="w-full sm:w-64">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Clasificación</label>
+                                    <select 
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-white font-semibold"
+                                        value={nuevaCat.clasificacion}
+                                        onChange={e => setNuevaCat({...nuevaCat, clasificacion: e.target.value})}
+                                    >
+                                        <option value="Fijo">Costo Fijo (Constante)</option>
+                                        <option value="Variable">Costo Variable (Operativo)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" className="w-full sm:w-auto bg-gray-800 hover:bg-black text-white font-bold py-2 px-6 rounded-lg text-sm transition-colors h-[38px]">
+                                    Crear Tipo
+                                </button>
+                            </form>
+                        </div>
+
+                        <p className="text-sm text-gray-500 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-2">
+                            <span>💡</span> <b>Tip interactivo:</b> Puedes agarrar los subtipos (los recuadros grises) y arrastrarlos para cambiar su orden o moverlos a otra categoría.
+                        </p>
+
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                
+                                {/* COLUMNA AZUL: FIJOS */}
+                                <div className="bg-blue-50/50 p-4 sm:p-6 rounded-2xl border border-blue-100">
+                                    <div className="mb-6 flex flex-col items-center text-center">
+                                        <h2 className="text-xl font-black text-blue-900 uppercase tracking-wide">Costos Fijos</h2>
+                                        <p className="text-xs text-blue-600 font-medium mt-1">Gastos recurrentes e independientes del volumen</p>
+                                    </div>
+                                    
+                                    <div className="space-y-6 h-[65vh] overflow-y-auto pr-2 scrollbar-hide pb-20">
+                                        {fijos.map(cat => (
+                                            <div key={cat.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                                {/* Header Categoría */}
+                                                <div className="bg-blue-600 px-4 py-3 flex justify-between items-center group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-blue-600">
+                                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+                                                        </div>
+                                                        <h3 className="font-bold text-white text-sm">{cat.nombre}</h3>
+                                                    </div>
+                                                    <button onClick={() => handleDeleteCategoria(cat.id, cat.nombre)} className="text-blue-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Eliminar Categoría">
+                                                        ✖
+                                                    </button>
+                                                </div>
+
+                                                {/* Droppable Area */}
+                                                <div className="p-3">
+                                                    <Droppable droppableId={cat.id}>
+                                                        {(provided, snapshot) => (
+                                                            <div 
+                                                                ref={provided.innerRef} 
+                                                                {...provided.droppableProps}
+                                                                className={`space-y-2 min-h-[50px] p-2 rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50' : 'bg-transparent'}`}
+                                                            >
+                                                                {cat.items.length === 0 && <p className="text-xs text-gray-400 text-center italic py-2">Arrastra subtipos aquí o crea nuevos</p>}
+                                                                {cat.items.map((item, index) => (
+                                                                    <Draggable key={item.id} draggableId={item.id} index={index}>
+                                                                        {(provided, snapshot) => (
+                                                                            <div
+                                                                                ref={provided.innerRef}
+                                                                                {...provided.draggableProps}
+                                                                                {...provided.dragHandleProps}
+                                                                                className={`flex items-center justify-between p-2 rounded-md text-sm border transition-shadow ${snapshot.isDragging ? 'bg-white shadow-lg border-blue-400 z-50' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-400 cursor-grab">⋮⋮</span>
+                                                                                    <span className="text-gray-700 font-medium">{item.content}</span>
+                                                                                </div>
+                                                                                <button onClick={() => handleDeleteItem(cat.id, item.id)} className="text-gray-400 hover:text-red-500 font-bold px-2">×</button>
+                                                                            </div>
+                                                                        )}
+                                                                    </Draggable>
+                                                                ))}
+                                                                {provided.placeholder}
+                                                            </div>
+                                                        )}
+                                                    </Droppable>
+
+                                                    {/* Añadir subtipo */}
+                                                    <div className="mt-2 flex gap-2 px-2">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Añadir nuevo desglose..." 
+                                                            className="flex-1 border-b border-gray-300 px-2 py-1 text-xs focus:border-blue-500 outline-none bg-transparent"
+                                                            value={nuevoItemInputs[cat.id] || ''}
+                                                            onChange={(e) => setNuevoItemInputs({ ...nuevoItemInputs, [cat.id]: e.target.value })}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleAddItem(cat.id)}
+                                                        />
+                                                        <button onClick={() => handleAddItem(cat.id)} className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded text-xs font-bold transition-colors">Añadir</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* COLUMNA NARANJA: VARIABLES */}
+                                <div className="bg-orange-50/50 p-4 sm:p-6 rounded-2xl border border-orange-100">
+                                    <div className="mb-6 flex flex-col items-center text-center">
+                                        <h2 className="text-xl font-black text-orange-900 uppercase tracking-wide">Costos Variables</h2>
+                                        <p className="text-xs text-orange-600 font-medium mt-1">Gastos según gestión operativa y cobranzas</p>
+                                    </div>
+                                    
+                                    <div className="space-y-6 h-[65vh] overflow-y-auto pr-2 scrollbar-hide pb-20">
+                                        {variables.map(cat => (
+                                            <div key={cat.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                                {/* Header Categoría */}
+                                                <div className="bg-orange-500 px-4 py-3 flex justify-between items-center group">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-orange-500">
+                                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd"/></svg>
+                                                        </div>
+                                                        <h3 className="font-bold text-white text-sm">{cat.nombre}</h3>
+                                                    </div>
+                                                    <button onClick={() => handleDeleteCategoria(cat.id, cat.nombre)} className="text-orange-200 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Eliminar Categoría">
+                                                        ✖
+                                                    </button>
+                                                </div>
+
+                                                {/* Droppable Area */}
+                                                <div className="p-3">
+                                                    <Droppable droppableId={cat.id}>
+                                                        {(provided, snapshot) => (
+                                                            <div 
+                                                                ref={provided.innerRef} 
+                                                                {...provided.droppableProps}
+                                                                className={`space-y-2 min-h-[50px] p-2 rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-orange-50' : 'bg-transparent'}`}
+                                                            >
+                                                                {cat.items.length === 0 && <p className="text-xs text-gray-400 text-center italic py-2">Arrastra subtipos aquí o crea nuevos</p>}
+                                                                {cat.items.map((item, index) => (
+                                                                    <Draggable key={item.id} draggableId={item.id} index={index}>
+                                                                        {(provided, snapshot) => (
+                                                                            <div
+                                                                                ref={provided.innerRef}
+                                                                                {...provided.draggableProps}
+                                                                                {...provided.dragHandleProps}
+                                                                                className={`flex items-center justify-between p-2 rounded-md text-sm border transition-shadow ${snapshot.isDragging ? 'bg-white shadow-lg border-orange-400 z-50' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-gray-400 cursor-grab">⋮⋮</span>
+                                                                                    <span className="text-gray-700 font-medium">{item.content}</span>
+                                                                                </div>
+                                                                                <button onClick={() => handleDeleteItem(cat.id, item.id)} className="text-gray-400 hover:text-red-500 font-bold px-2">×</button>
+                                                                            </div>
+                                                                        )}
+                                                                    </Draggable>
+                                                                ))}
+                                                                {provided.placeholder}
+                                                            </div>
+                                                        )}
+                                                    </Droppable>
+
+                                                    {/* Añadir subtipo */}
+                                                    <div className="mt-2 flex gap-2 px-2">
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="Añadir nuevo desglose..." 
+                                                            className="flex-1 border-b border-gray-300 px-2 py-1 text-xs focus:border-orange-500 outline-none bg-transparent"
+                                                            value={nuevoItemInputs[cat.id] || ''}
+                                                            onChange={(e) => setNuevoItemInputs({ ...nuevoItemInputs, [cat.id]: e.target.value })}
+                                                            onKeyDown={(e) => e.key === 'Enter' && handleAddItem(cat.id)}
+                                                        />
+                                                        <button onClick={() => handleAddItem(cat.id)} className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-3 py-1 rounded text-xs font-bold transition-colors">Añadir</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </DragDropContext>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AdminGastosApp />);
+    </script>
+</body>
+</html>
